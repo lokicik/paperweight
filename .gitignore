@@ -1,0 +1,38 @@
+# Local PDF inputs, outputs and previews
+*.pdf
+*.djvu
+.cache/
+.local-archive/
+qa/
+samples/
+output/
+*.log
+.env
+.env.*
+!.env.example
+.impeccable/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# JavaScript / Rust / desktop build products
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/*
+!src-tauri/binaries/.gitkeep
+# Only the desktop icons referenced by tauri.conf.json are source assets.
+src-tauri/icons/*
+!src-tauri/icons/32x32.png
+!src-tauri/icons/128x128.png
+!src-tauri/icons/128x128@2x.png
+!src-tauri/icons/icon.ico
+.DS_Store
+Thumbs.db

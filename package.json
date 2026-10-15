@@ -1,0 +1,16 @@
+{
+  "name": "paperweight",
+  "version": "0.1.0",
+  "private": true,
+  "description": "See what makes a PDF heavy, then make a smaller, verified copy. Everything stays on your computer.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check:frontend": "node --check web/app.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1"
+  }
+}

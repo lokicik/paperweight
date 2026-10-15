@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Paperweight</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<svg class="icon-defs" aria-hidden="true"><defs>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h6"/></symbol>
+<symbol id="i-mark" viewBox="0 0 24 24"><path d="M7 13.5V4h7l4 4v5.5M14 4v4h4M5 19.5a7 7 0 0 1 14 0M3.5 19.5h17"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><path d="M3 3h11v10H3zM17 3h4v10h-4zM3 16h7v5H3zM13 16h8v5h-8z"/></symbol>
+<symbol id="i-page" viewBox="0 0 24 24"><path d="M7 3h13v16H7zM4 6v15h13M10 7h7M10 11h7M10 15h4"/></symbol>
+<symbol id="i-object" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 8v9l9 5 9-5V8M12 13v9"/></symbol>
+<symbol id="i-open" viewBox="0 0 24 24"><path d="M3 7V4h7l3 3h8v3M3 7v13h16l3-10H6z"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6M8 12h13"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 17v4h16v-4"/></symbol>
+<symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+<symbol id="i-organize" viewBox="0 0 24 24"><path d="M3 4h7v9H3zM14 11h7v9h-7zM6.5 16v3.5h4M17.5 8V4.5h-4"/></symbol>
+<symbol id="i-turn-left" viewBox="0 0 24 24"><path d="M4 9a8 8 0 1 1 1.8 8M4 4v5h5"/></symbol>
+<symbol id="i-turn-right" viewBox="0 0 24 24"><path d="M20 9a8 8 0 1 0-1.8 8M20 4v5h-5"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13M10 11v5M14 11v5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+<symbol id="i-compress" viewBox="0 0 24 24"><path d="M4 10h16M4 14h16M12 2v5m-2.5-2.5L12 7l2.5-2.5M12 22v-5m-2.5 2.5L12 17l2.5 2.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 2.5 20h19zM12 10v4.5M12 17.5v.5"/></symbol>
+<symbol id="i-split" viewBox="0 0 24 24"><path d="M4 3h10v7H4zM4 14h10v7H4zM17 6.5h4M17 17.5h4M19 6.5v11"/></symbol>
+<symbol id="i-combine" viewBox="0 0 24 24"><path d="M3 4h7v6H3zM3 14h7v6H3zM14 7h7v10h-7zM10 7h2a2 2 0 0 1 2 2M10 17h2a2 2 0 0 0 2-2"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+<symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+</defs></svg>
+<header class="topbar"><a class="brand" href="/" aria-label="Paperweight, start over"><svg><use href="#i-mark"/></svg><span>Paperweight</span></a><div class="doc-title" id="doc-title" hidden><strong id="doc-name"></strong><span id="doc-meta"></span></div><div class="top-actions"><button class="button primary" id="shrink-button" data-view="compress" hidden><svg><use href="#i-compress"/></svg>Make it smaller</button><a class="button quiet" id="save-pdf" download hidden><svg><use href="#i-down"/></svg>Save PDF</a><button class="button quiet" id="open-file" aria-label="Open a file"><svg><use href="#i-open"/></svg><span>Open</span></button></div><input id="file-input" type="file" accept="application/pdf,.pdf,.pptx,.ppt,.pptm,.ppsx,.pps,.ppsm,.potx,.pot,.odp" multiple hidden></header>
+<div class="shell" id="shell">
+<nav class="sidebar" id="sidebar" aria-label="Views" hidden>
+<button data-view="map" class="nav-item"><svg><use href="#i-grid"/></svg><span>Overview</span></button>
+<button data-view="pages" class="nav-item"><svg><use href="#i-page"/></svg><span>Pages</span><small id="page-count"></small></button>
+<button data-view="organize" class="nav-item"><svg><use href="#i-organize"/></svg><span>Organize</span></button>
+<button data-view="split" class="nav-item"><svg><use href="#i-split"/></svg><span>Split</span></button>
+<button data-view="objects" class="nav-item"><svg><use href="#i-object"/></svg><span>Parts</span><small id="object-count"></small></button>
+<button data-view="compress" class="nav-item"><svg><use href="#i-compress"/></svg><span>Make smaller</span><small id="compress-badge"></small></button>
+</nav>
+<main id="main">
+<div id="notice" class="notice" role="alert" hidden></div>
+<section id="welcome" class="welcome">
+<h1>See what makes a PDF big, then shrink it.</h1>
+<p>Find the pages and images taking up space and save a smaller copy. Split, combine or reorder pages too. Your files never leave this computer.</p>
+<button class="dropzone" id="dropzone"><svg><use href="#i-open"/></svg><strong id="dropzone-title">Drop a PDF here or choose a file</strong><span>Up to 1 GB. Drop several to combine them or make each smaller.</span></button>
+<div id="samples" class="samples"></div>
+</section>
+<section id="loading" class="loading" role="status" aria-live="polite" hidden><h1 id="loading-title">Reading your PDF…</h1><p id="loading-detail"></p><progress id="upload-progress" max="100" hidden></progress><div><button class="button quiet" id="cancel-open" hidden>Cancel</button></div></section>
+<section id="batch" class="batch" hidden>
+<div class="segmented batch-mode" role="radiogroup" aria-label="What to do" id="batch-mode"><button type="button" data-batch-mode="compress" class="active">Make each smaller</button><button type="button" data-batch-mode="combine">Combine into one PDF</button></div>
+<h1 id="batch-title">Make several PDFs smaller</h1>
+<p class="batch-lede" id="batch-lede">Each file gets its own checked copy. The originals stay as they are.</p>
+<div class="batch-settings" id="batch-settings"><div class="segmented" role="radiogroup" aria-label="Quality" id="batch-quality"><button type="button" data-batch-preset="lossless">Lossless</button><button type="button" data-batch-preset="high" class="active">High</button><button type="button" data-batch-preset="balanced">Balanced</button><button type="button" data-batch-preset="compact">Compact</button></div><label class="check"><input type="checkbox" id="batch-use-limit">Keep each under</label><input type="number" id="batch-target" min="0.1" step="0.1" value="90" aria-label="Size limit in MB" disabled><span>MB</span></div>
+<p class="note" id="batch-hint"></p>
+<table class="batch-list"><thead><tr><th>File</th><th class="num">Size</th><th class="num" id="batch-result-head">Smaller copy</th><th class="num"><span class="visually-hidden">Actions</span></th></tr></thead><tbody id="batch-rows"></tbody></table>
+<div id="combine-result" class="organize-result" hidden></div>
+<div class="actions batch-actions"><button class="button primary" id="batch-start" type="button"><svg><use href="#i-compress"/></svg>Make all smaller</button><button class="button primary" id="combine-start" type="button" hidden><svg><use href="#i-combine"/></svg>Combine into one PDF</button><a class="button primary" id="batch-save-all" download hidden><svg><use href="#i-down"/></svg>Save all (ZIP)</a><button class="button quiet" id="batch-stop" type="button" hidden>Stop</button><button class="button quiet" id="batch-add" type="button">Add files</button><button class="text-button" id="batch-clear" type="button">Start over</button></div>
+</section>
+<section id="workspace" hidden>
+<div class="view-head"><button class="breadcrumb" id="breadcrumb" data-reset hidden><svg><use href="#i-back"/></svg>All of the file</button><h2 id="view-title"></h2><p id="view-description"></p></div>
+<section class="map-region" id="map-region" aria-label="Space map"><div class="map-scroll" id="map-scroll"><div id="treemap" class="treemap"></div></div><div class="map-caption"><span id="map-caption"></span><button class="text-button" id="map-help">How sizes are counted</button></div></section>
+<div id="accounting" class="accounting" hidden><h3>How sizes are counted</h3><p>Each part of the file is counted once, so the blocks add up to the file’s size on disk. A picture used on several pages still counts once.</p><p>A page’s size includes everything it uses, so shared parts appear under every page that uses them. That is why page sizes don’t add up to the file size.</p><p>These are the sizes stored today, not a prediction of savings. Savings are measured on the finished copy.</p><div class="accounting-actions"><button class="text-button" id="export">Download this breakdown (JSON)</button><button class="text-button" id="close-help">Close</button></div></div>
+<section class="table-section" id="table-section"><div class="table-toolbar"><h3 id="table-title"></h3><div class="table-controls"><label class="search"><svg><use href="#i-search"/></svg><input type="search" id="search" placeholder="Search" aria-label="Search pages or parts"></label><select id="category-filter" aria-label="Show"></select><select id="sort" aria-label="Sort"><option value="size">Largest first</option><option value="number">In order</option></select></div></div><div class="table-scroll"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div><div class="table-footer"><span id="results-count"></span><div><button class="button quiet small" id="previous">Previous</button><button class="button quiet small" id="next">Next</button></div></div></section>
+<section class="organize" id="organize-region" aria-label="Organize pages" hidden>
+<div class="organize-bar"><p id="organize-summary" class="organize-summary" aria-live="polite"></p>
+<div class="organize-tools" role="toolbar" aria-label="Page actions"><button class="button quiet small" type="button" data-org="left" title="Turn left (L)"><svg><use href="#i-turn-left"/></svg>Turn left</button><button class="button quiet small" type="button" data-org="right" title="Turn right (R)"><svg><use href="#i-turn-right"/></svg>Turn right</button><button class="button quiet small" type="button" data-org="delete" title="Delete (Del)"><svg><use href="#i-trash"/></svg>Delete</button><button class="button quiet small" type="button" data-org="blank"><svg><use href="#i-plus"/></svg>Blank page</button><button class="button quiet small" type="button" data-org="insert"><svg><use href="#i-open"/></svg>Insert PDF…</button><button class="button quiet small" type="button" data-org="undo" title="Undo (Ctrl+Z)"><svg><use href="#i-undo"/></svg>Undo</button></div>
+<button class="button primary small" type="button" id="organize-save">Save as new PDF</button></div>
+<div id="organize-result" class="organize-result" hidden></div>
+<div class="page-grid" id="page-grid" role="listbox" aria-label="Pages" aria-multiselectable="true"></div>
+<input type="file" id="insert-input" accept="application/pdf,.pdf,.pptx,.ppt,.pptm,.ppsx,.pps,.ppsm,.potx,.pot,.odp" hidden>
+</section>
+<section class="split" id="split-region" aria-label="Split into several PDFs" hidden>
+<form id="split-form" novalidate>
+<fieldset class="split-modes"><legend class="visually-hidden">How to split</legend>
+<label class="split-mode"><input type="radio" name="split" value="every" checked><span>Every</span><input type="number" id="split-every" min="1" value="10" aria-label="Pages per part"><span>pages</span></label>
+<label class="split-mode"><input type="radio" name="split" value="ranges"><span>At these pages</span><input type="text" id="split-ranges" placeholder="e.g. 1–20, 21–48, 49–" autocomplete="off" spellcheck="false" aria-label="Page ranges"></label>
+<label class="split-mode" id="split-bookmarks"><input type="radio" name="split" value="bookmarks"><span>At bookmarks, down to level</span><select id="split-level" aria-label="Bookmark level"></select></label>
+<label class="split-mode"><input type="radio" name="split" value="size"><span>Into parts under</span><input type="number" id="split-size" min="0.01" step="any" value="10" aria-label="Part size in MB"><span>MB</span></label>
+</fieldset>
+<p class="note" id="split-preview" aria-live="polite"></p>
+<div class="submit-row"><button class="button primary" type="submit" id="split-start"><svg><use href="#i-split"/></svg>Split into PDFs</button><p>Bookmarks and links inside each part keep working. Your original stays as it is.</p></div>
+</form>
+<div id="split-result" class="split-result" hidden></div>
+</section>
+<section class="compress" id="compress-region" aria-label="Make a smaller copy" hidden>
+<form id="compress-form">
+<fieldset class="qualities"><legend id="quality-legend">Quality</legend>
+<label class="quality"><input type="radio" name="preset" value="lossless"><span class="quality-name">Lossless</span><span class="quality-detail">No redrawing. Only removes hidden data and repacks the file.</span><span class="quality-sample" data-sample-for="lossless"></span></label>
+<label class="quality"><input type="radio" name="preset" value="high" checked><span class="quality-name">High</span><span class="quality-detail">200 DPI. Looks like the original at reading size.</span><span class="quality-sample" data-sample-for="high"></span></label>
+<label class="quality"><input type="radio" name="preset" value="balanced"><span class="quality-name">Balanced</span><span class="quality-detail">150 DPI. Fine lines soften when you zoom in.</span><span class="quality-sample" data-sample-for="balanced"></span></label>
+<label class="quality"><input type="radio" name="preset" value="compact"><span class="quality-name">Compact</span><span class="quality-detail">110 DPI. Smallest; drawings look visibly softer.</span><span class="quality-sample" data-sample-for="compact"></span></label>
+</fieldset>
+<div class="limit"><label class="check"><input type="checkbox" id="use-limit">Keep it under</label><input type="number" id="target-mb" min="0.1" step="0.1" aria-label="Size limit in MB" disabled><span>MB</span><p id="limit-hint" hidden>Tries Lossless first, then lowers quality only if needed, never below your choice.</p><label class="check split-option" id="split-option" hidden><input type="checkbox" id="use-split">If it still doesn’t fit, also split it into parts under this size</label></div>
+<details class="more" id="more-options"><summary>More options</summary>
+<div class="more-body">
+<fieldset class="extras" id="extras" hidden><legend>Also remove</legend><div id="extras-list"></div></fieldset>
+<label class="keep"><span>Keep these pages as they are</span><input type="text" id="keep-pages" placeholder="e.g. 12, 40–45" autocomplete="off" spellcheck="false"><small>Nothing on them is redrawn or re-encoded.</small></label>
+</div></details>
+<div class="sample-pick"><span class="sample-label">Preview a page</span><span id="sample-suggestions" class="sample-suggestions"></span><label class="sample-input"><span>Page</span><input type="number" id="sample-page" min="1" aria-label="Page number to preview"></label><button class="button quiet small" type="button" id="sample-run">Preview</button></div>
+<div id="sample-view" class="compare-box" aria-live="polite" hidden></div>
+<div class="submit-row"><button class="button primary" type="submit"><svg><use href="#i-compress"/></svg>Create smaller copy</button><p>Large books take a few minutes. Your original stays as it is.</p></div>
+</form>
+<div id="compress-progress" class="compress-progress" role="status" aria-live="polite" hidden><h3 id="compress-phase">Starting…</h3><progress id="compress-bar" max="1"></progress><p id="compress-count"></p><button class="button quiet" id="cancel-compress" type="button">Cancel</button></div>
+<div id="compress-result" class="compress-result" hidden></div>
+</section>
+</section>
+</main>
+<aside class="inspector" id="inspector" aria-label="Details" hidden><button class="icon-button" id="clear-selection" aria-label="Close details"><svg><use href="#i-close"/></svg></button><div id="inspector-body"></div></aside>
+</div>
+<div id="drop-overlay" class="drop-overlay" hidden>Drop to open</div>
+</body></html>
