@@ -7,12 +7,25 @@ const PRESETS = {lossless: 'Lossless', high: 'High', balanced: 'Balanced', compa
 // A page is changed by redrawing it, or by re-encoding its images at their own resolution.
 const CHANGED = ['converted', 'reencoded'];
 const PRESENTATION = /\.(pptx|ppt|pptm|ppsx|pps|ppsm|potx|pot|odp)$/i;
-// PDFs, and presentations when PowerPoint or LibreOffice is there to convert them.
-const openable = name => /\.pdf$/i.test(name) || (PRESENTATION.test(name) && !!state.config?.converter);
+const RECORDINGS = ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'oga', 'opus', 'flac', 'wma', 'amr', 'webm', 'mp4', 'm4v', 'mov', 'mkv', 'avi', 'wmv', 'mpeg', 'mpg', '3gp'];
+const RECORDING = new RegExp(`\\.(${RECORDINGS.join('|')})$`, 'i');
+const TRANSCRIPT = /\.json$/i;  // an AssemblyAI export
+// PDFs and transcripts; presentations when PowerPoint or LibreOffice is there to convert them,
+// and recordings when this copy can send them to AssemblyAI.
+const openable = name => /\.pdf$/i.test(name) || TRANSCRIPT.test(name) || (PRESENTATION.test(name) && !!state.config?.converter) || (RECORDING.test(name) && !!state.config?.transcriber);
+const largest = name => (RECORDING.test(name) ? 2 : 1) * 1024 ** 3;
+function kinds(plural) {
+  const k = [plural ? 'PDFs' : 'a PDF'];
+  if (state.config?.converter) k.push(plural ? 'presentations' : 'a PowerPoint file');
+  if (state.config?.transcriber) k.push(plural ? 'lecture recordings' : 'a lecture recording');
+  return k.length > 1 ? `${k.slice(0, -1).join(', ')} or ${k.at(-1)}` : k[0];
+}
 function cannotOpen(name) {
   if (PRESENTATION.test(name)) return 'Opening presentations needs Microsoft PowerPoint or LibreOffice on this computer.';
-  return state.config?.converter ? 'Choose a PDF or a PowerPoint file.' : 'That isn’t a PDF. Choose a file ending in .pdf.';
+  if (RECORDING.test(name)) return 'Transcribing recordings isn’t set up in this copy of Paperweight.';
+  return state.config?.converter || state.config?.transcriber ? `Choose ${kinds()}.` : 'That isn’t a PDF. Choose a file ending in .pdf.';
 }
+const LOADING = [[/^Converting/, 'Converting your slides…'], [/^(Uploading|Transcribing)/, 'Transcribing your recording…'], [/^Writing the transcript/, 'Writing the transcript…']];
 const after = p => p.afterBytes ?? p.imageBytes + p.textBytes;
 const EXTRAS = {
   editing: ['Editing data from design apps', 'Used only to reopen the file in Illustrator or Photoshop. Pages look the same.', true],
@@ -62,18 +75,19 @@ function busy(value) {
 }
 
 // Opening and analysing ------------------------------------------------------
-async function awaitAnalysis(job) {
+async function awaitAnalysis(job, title = 'Measuring your PDF…') {
   state.job = job; state.xhr = null;
   $('upload-progress').hidden = false; $('upload-progress').removeAttribute('value');
-  $('loading-title').textContent = 'Measuring your PDF…'; $('loading-detail').textContent = '';
+  $('loading-title').textContent = title; $('loading-detail').textContent = '';
   while (true) {
     const result = await api('/api/job/' + job);
     if (result.status === 'error') throw Error(result.error);
     if (result.status === 'cancelled') { surface(state.doc ? 'workspace' : 'welcome'); notice('Stopped. Your PDF is unchanged.'); return }
     if (result.phase) {
-      $('loading-title').textContent = result.phase.startsWith('Converting') ? 'Converting your slides…' : 'Measuring your PDF…';
+      $('loading-title').textContent = LOADING.find(([pattern]) => pattern.test(result.phase))?.[1] ?? 'Measuring your PDF…';
       $('loading-detail').textContent = result.total > 1 ? `${result.phase} · ${Math.floor(100 * result.completed / result.total)}%` : result.phase;
-      $('upload-progress').max = result.total; $('upload-progress').value = result.completed;
+      // Transcribing has no measurable progress; the bar just shows it is working.
+      if (result.total > 0) { $('upload-progress').max = result.total; $('upload-progress').value = result.completed } else $('upload-progress').removeAttribute('value');
     }
     if (result.status === 'ready') {
       state.doc = await api('/api/document/' + result.id);
@@ -97,9 +111,10 @@ async function openSample(id) {
 function upload(file) {
   if (!file || state.busy || !state.config) return;
   if (!openable(file.name)) { notice(cannotOpen(file.name)); return }
-  if (file.size > 1024 ** 3) { notice('Choose a file smaller than 1 GB.'); return }
+  if (file.size > largest(file.name)) { notice(`Choose a file smaller than ${largest(file.name) / 1024 ** 3} GB.`); return }
   busy(true); notice(''); surface('loading');
-  $('loading-title').textContent = PRESENTATION.test(file.name) ? 'Opening your presentation…' : 'Opening your PDF…'; $('loading-detail').textContent = file.name;
+  $('loading-title').textContent = PRESENTATION.test(file.name) ? 'Opening your presentation…' : RECORDING.test(file.name) ? 'Opening your recording…' : TRANSCRIPT.test(file.name) ? 'Opening your transcript…' : 'Opening your PDF…';
+  $('loading-detail').textContent = file.name;
   $('upload-progress').hidden = false; $('upload-progress').max = 100; $('upload-progress').value = 0;
   const xhr = new XMLHttpRequest(); state.xhr = xhr;
   xhr.open('POST', '/api/open'); xhr.setRequestHeader('X-Explorer-Token', state.config.token); xhr.setRequestHeader('X-Filename', encodeURIComponent(file.name));
@@ -107,7 +122,10 @@ function upload(file) {
   xhr.onerror = () => { notice('Paperweight stopped responding. Restart it and try again.'); surface(state.doc ? 'workspace' : 'welcome'); busy(false) };
   xhr.onabort = () => { notice('Stopped. Your PDF is unchanged.'); surface(state.doc ? 'workspace' : 'welcome'); busy(false) };
   xhr.onload = async () => {
-    try { const result = JSON.parse(xhr.responseText); if (xhr.status >= 400) throw Error(result.error); await awaitAnalysis(result.job) }
+    try {
+      const result = JSON.parse(xhr.responseText); if (xhr.status >= 400) throw Error(result.error);
+      await awaitAnalysis(result.job, PRESENTATION.test(file.name) ? 'Converting your slides…' : RECORDING.test(file.name) ? 'Transcribing your recording…' : TRANSCRIPT.test(file.name) ? 'Writing the transcript…' : undefined);
+    }
     catch (e) { notice(e.message); surface(state.doc ? 'workspace' : 'welcome') }
     finally { busy(false) }
   };
@@ -664,20 +682,20 @@ const BATCH_HINTS = {
 };
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 function startBatch(files) {
-  const kinds = state.config?.converter ? 'PDFs and presentations' : 'PDFs';
-  const usable = [...files].filter(f => openable(f.name) && f.size <= 1024 ** 3);
-  if (!usable.length) { notice(`Choose ${kinds} smaller than 1 GB.`); return }
+  const limits = state.config?.transcriber ? 'up to 1 GB, recordings up to 2 GB' : 'up to 1 GB';
+  const usable = [...files].filter(f => openable(f.name) && f.size <= largest(f.name));
+  if (!usable.length) { notice(`Choose ${kinds(true)}, ${limits}.`); return }
   state.batch ??= {items: [], preset: 'high', mode: 'compress', running: false};
   for (const file of usable) state.batch.items.push({file, name: file.name, bytes: file.size, status: 'waiting'});
   state.batch.combined = null;
   const skipped = files.length - usable.length;
-  notice(skipped ? `${num(skipped)} file${skipped === 1 ? ' was' : 's were'} skipped: only ${kinds} up to 1 GB.` : '');
+  notice(skipped ? `${num(skipped)} file${skipped === 1 ? ' was' : 's were'} skipped: only ${kinds(true)}, ${limits}.` : '');
   surface('batch'); renderBatch();
 }
-// Upload and analyse one file of the list, once; presentations are converted first.
+// Upload and analyse one file of the list, once; presentations are converted and recordings transcribed first.
 async function openItem(item) {
   if (item.doc) return item.doc;
-  item.status = PRESENTATION.test(item.name) ? 'converting' : 'opening'; renderBatch();
+  item.status = PRESENTATION.test(item.name) ? 'converting' : RECORDING.test(item.name) ? 'transcribing' : 'opening'; renderBatch();
   const response = await fetch('/api/open', {method: 'POST', headers: {'X-Explorer-Token': state.config.token, 'X-Filename': encodeURIComponent(item.name)}, body: item.file});
   const opened = await response.json(); if (!response.ok) throw Error(opened.error);
   item.analysis = opened.job;
@@ -694,7 +712,7 @@ function batchStatus(item) {
     return `<span class="strong">${size(r.bytes)}</span> <small>${saved > 0 ? `−${saved}%` : 'no smaller'}</small>${r.targetMet === false ? ' <small class="warn-text">over the limit</small>' : ''}`;
   }
   if (state.batch.mode === 'combine' && item.pages) return `${num(item.pages)} page${item.pages === 1 ? '' : 's'}`;
-  return {waiting: '<small>Waiting</small>', opening: '<small>Opening…</small>', measuring: '<small>Measuring…</small>', converting: '<small>Converting…</small>', ready: '<small>Ready</small>',
+  return {waiting: '<small>Waiting</small>', opening: '<small>Opening…</small>', measuring: '<small>Measuring…</small>', converting: '<small>Converting…</small>', transcribing: '<small>Transcribing…</small>', ready: '<small>Ready</small>',
     compressing: `<small>${esc(item.phase || 'Working')}${item.progress ? ` · ${item.progress}%` : '…'}</small>`,
     stopped: '<small>Stopped</small>', error: `<small class="warn-text" title="${esc(item.error)}">${state.batch.mode === 'combine' ? 'Couldn’t open it' : 'Couldn’t make it smaller'}</small>`}[item.status];
 }
@@ -900,7 +918,14 @@ async function init() {
   surface('welcome'); busy(true);
   try {
     state.config = await api('/api/config'); busy(false);
-    if (state.config.converter) $('dropzone-title').textContent = 'Drop a PDF or a PowerPoint file here, or choose one';
+    const {converter, transcriber} = state.config;
+    if (converter || transcriber) $('dropzone-title').textContent = `Drop ${kinds()} here, or choose one`;
+    $('file-input').accept = ['application/pdf,.pdf,.json', converter && '.pptx,.ppt,.pptm,.ppsx,.pps,.ppsm,.potx,.pot,.odp',
+      transcriber && RECORDINGS.map(e => '.' + e).join(',')].filter(Boolean).join(',');
+    if (transcriber) {
+      $('dropzone-detail').textContent = 'Up to 1 GB, recordings up to 2 GB. Drop several to combine them or make each smaller.';
+      $('welcome-lede').textContent = 'Find the pages and images taking up space and save a smaller copy. Split, combine or reorder pages, and turn lecture recordings into transcripts. Recordings are sent to AssemblyAI to be transcribed and deleted there right after; everything else stays on this computer.';
+    }
     $('samples').innerHTML = state.config.samples.map(s => `<button class="sample" data-sample="${s.id}">${icon('file')}<span>${esc(s.name)}</span><small>${size(s.bytes)}</small></button>`).join('');
     document.querySelectorAll('[data-sample]').forEach(b => b.onclick = () => openSample(Number(b.dataset.sample)));
     const sample = new URLSearchParams(location.search).get('sample');

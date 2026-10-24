@@ -10,6 +10,9 @@ output/
 .env
 .env.*
 !.env.example
+# The AssemblyAI key and the module build_sidecar.py makes from it
+assemblyai.key
+backend/paperweight/_key.py
 .impeccable/
 
 # Python

@@ -20,10 +20,11 @@ See what makes a PDF heavy, then make a smaller, verified copy. Open a document,
 - Combine several PDFs into one, in the order you set. Each file becomes a top-level bookmark over its own bookmarks; links inside each file keep working, and every page is checked against its file.
 - Split a PDF every N pages, at page ranges, at bookmarks down to a chosen level, or into parts under a size. Each part keeps the bookmarks and links inside it; parts are saved one by one or as a ZIP.
 - Open PowerPoint presentations (.pptx, .ppt, .ppsx and more) as PDFs, converted by Microsoft PowerPoint or LibreOffice when one is installed. Save the PDF, make it smaller, split it or combine it with others.
+- Turn lecture recordings (audio or video, up to 2 GB) into transcript PDFs. The recording is transcribed by AssemblyAI with speaker labels, then deleted there. The PDF keeps every word, in paragraphs with the time each starts and who is speaking (Lecturer or Student when one voice does most of the talking), with a bookmark every five minutes. An AssemblyAI JSON export opens the same way, without the service.
 - Opens PDFs passed at launch: double-click, Open with, or a file dropped on the app icon.
 - Page preview before compressing: see any page, or the heaviest ones, at every quality next to the original, with zoom.
 - Every copy is checked against the original on all pages (text, links, bookmarks, page boxes) before it is offered. Redrawn pages can be compared side by side.
-- No account, external upload or telemetry. Original PDFs are opened read-only.
+- No account or telemetry. Nothing is uploaded except recordings you choose to transcribe, which go to AssemblyAI. Original PDFs are opened read-only.
 
 ## Development on Windows
 
@@ -60,6 +61,8 @@ pnpm build
 ```
 
 The installer is generated in `src-tauri/target/release/bundle/nsis/`. Development builds are unsigned. macOS and Linux packaging have not been validated.
+
+Transcribing recordings needs an AssemblyAI API key. Put it in `assemblyai.key` at the repository root (ignored by Git) or in `ASSEMBLYAI_API_KEY` before building the engine, and it is built into the executable; without one, recordings do not open. The key is only masked, so anyone with the installer can recover it and use your AssemblyAI balance. Share such builds only with people you trust, and replace the key if it leaks. For development, `ASSEMBLYAI_API_KEY` in the environment is enough.
 
 ## Test
 

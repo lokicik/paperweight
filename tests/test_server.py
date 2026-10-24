@@ -204,6 +204,49 @@ class ServerTests(unittest.TestCase):
             server.convert = real
             self.engine.converter = server.converter_available()
 
+    def test_transcripts_and_recordings_open_as_pdfs(self):
+        words = [{'text': w, 'start': i * 400, 'end': i * 400 + 300, 'speaker': 'A'} for i, w in enumerate('Good morning, everyone.'.split())]
+        before = set(Path(self.temp.name).glob('*.json'))
+        job = json.loads(self.request('/api/open', json.dumps(words).encode(), {'X-Filename': 'lecture.json'}))['job']
+        self.assertEqual(self.wait_analysis(job)['status'], 'ready')
+        report = json.loads(self.request('/api/document/' + job))
+        self.assertEqual((report['name'], report['convertedFrom'], report['pageCount']), ('lecture-transcript.pdf', 'lecture.json', 1))
+        self.assertIn(b'Good morning', fitz.open('pdf', self.request(f'/api/document/{job}/download'))[0].get_text().encode())
+        # Only the analysis report is left; the uploaded transcript is removed.
+        self.assertEqual(set(Path(self.temp.name).glob('*.json')) - before, {Path(self.temp.name) / (job + '.json')})
+        with self.assertRaises(HTTPError) as error:
+            self.request('/api/open', b'%PDF-1.7', {'X-Filename': 'lecture.json'})
+        self.assertEqual(error.exception.code, 400)
+
+        started, stop_seen = threading.Event(), threading.Event()
+
+        def fake_transcript(source, destination, title, progress, stop):
+            progress('Uploading the recording', 5, 10)
+            started.set()
+            if stop.wait(10):
+                stop_seen.set()
+                raise ValueError('stopped')
+        real, server.transcript_pdf = server.transcript_pdf, fake_transcript
+        try:
+            self.engine.transcriber = None
+            with self.assertRaises(HTTPError) as error:
+                self.request('/api/open', b'ID3 audio', {'X-Filename': 'lecture.mp3'})
+            self.assertIn('not set up', json.loads(error.exception.read())['error'])
+            self.engine.transcriber = 'AssemblyAI'
+            job = json.loads(self.request('/api/open', b'ID3 audio', {'X-Filename': 'lecture.mp3'}))['job']
+            self.assertTrue(started.wait(10))
+            status = json.loads(self.request('/api/job/' + job))
+            self.assertEqual((status['phase'], status['completed'], status['total']), ('Uploading the recording', 5, 10))
+            self.assertEqual(json.loads(self.request(f'/api/job/{job}/cancel', b'{}'))['status'], 'cancelled')
+            self.assertTrue(stop_seen.wait(10))
+            deadline = time.monotonic() + 5
+            while list(Path(self.temp.name).glob('*.mp3')) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertFalse(list(Path(self.temp.name).glob('*.mp3')))
+        finally:
+            server.transcript_pdf = real
+            self.engine.transcriber = server.transcriber_available()
+
     def test_several_copies_save_as_one_zip(self):
         document = self.open_sample()
         jobs = []

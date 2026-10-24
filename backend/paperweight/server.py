@@ -20,6 +20,7 @@ from paperweight.analyzer import inspect_pdf, object_info, preview
 from paperweight.compressor import CHANGED, ORDER, PRESETS, REASONS, REMOVALS, Cancelled, compress, prepare_page
 from paperweight.converter import available as converter_available, convert, is_presentation
 from paperweight.organizer import check_pages, file_name, merge, organize, split, split_by_size, split_plan
+from paperweight.transcriber import available as transcriber_available, is_recording, is_transcript, transcript_pdf
 
 RESOURCES = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[2]))
 
@@ -99,20 +100,33 @@ class Engine:
         self.sampler = None
         self.lock = threading.RLock()
         self.converter = converter_available()
+        self.transcriber = transcriber_available()
 
     def submit(self, source, name):
-        """Analyse a PDF in a process of its own. A presentation is converted
-        to PDF first, in a thread that can stop the converter."""
+        """Analyse a PDF in a process of its own. A presentation, recording or
+        transcript becomes a PDF first, in a thread that can be stopped."""
         with self.lock:
             ident = uuid.uuid4().hex
             job = self.jobs[ident] = {
                 'path': Path(source), 'report_path': self.directory / (ident + '.json'), 'name': name,
                 'status': 'analysing', 'phase': 'Opening PDF', 'completed': 0, 'total': 1,
             }
+            stem, source = Path(name).stem, Path(source)
             if is_presentation(name):
-                job.update(path=self.directory / (ident + '.pdf'), name=Path(name).stem + '.pdf',
-                           convertedFrom=Path(name).name, phase=f'Converting slides with {self.converter}')
-                threading.Thread(target=self.convert_then_analyse, args=(ident, Path(source)), daemon=True).start()
+                job.update(path=self.directory / (ident + '.pdf'), name=stem + '.pdf', convertedFrom=Path(name).name,
+                           tool=self.converter, phase=f'Converting slides with {self.converter}')
+                make = lambda destination: convert(source, destination, started=lambda process: job.__setitem__('converter', process))
+                threading.Thread(target=self.convert_then_analyse, args=(ident, source, make, 'Could not convert this presentation.'), daemon=True).start()
+            elif is_recording(name) or is_transcript(name):
+                job.update(path=self.directory / (ident + '.pdf'), name=stem + '-transcript.pdf', convertedFrom=Path(name).name,
+                           tool='AssemblyAI', stop=threading.Event(), phase='Writing the transcript', total=0)
+
+                def progress(phase, completed, total):
+                    with self.lock:
+                        if job['status'] == 'analysing':
+                            job.update(phase=phase, completed=completed, total=total)
+                make = lambda destination: transcript_pdf(source, destination, stem, progress, job['stop'])
+                threading.Thread(target=self.convert_then_analyse, args=(ident, source, make, 'Could not transcribe this recording.'), daemon=True).start()
             else:
                 self.start_analysis(ident)
             return ident
@@ -123,20 +137,21 @@ class Engine:
         job['process'] = self.context.Process(target=analyze_to_file, args=(str(job['path']), str(job['report_path']), job['events']))
         job['process'].start()
 
-    def convert_then_analyse(self, ident, source):
+    def convert_then_analyse(self, ident, source, make, failure):
+        """Write the job's PDF with `make(destination)`, then analyse it."""
         job = self.jobs[ident]
         try:
-            convert(source, job['path'], started=lambda process: job.__setitem__('converter', process))
+            make(job['path'])
         except Exception as exc:
             with self.lock:
                 if job['status'] == 'analysing':
-                    job.update(status='error', error=str(exc) if isinstance(exc, ValueError) else 'Could not convert this presentation.')
+                    job.update(status='error', error=str(exc) if isinstance(exc, ValueError) else failure)
             return
         finally:
             source.unlink(missing_ok=True)
         with self.lock:
             if job['status'] == 'analysing':
-                job['phase'] = 'Opening PDF'
+                job.update(phase='Opening PDF', completed=0, total=1)
                 self.start_analysis(ident)
 
     def poll(self, ident):
@@ -161,7 +176,7 @@ class Engine:
                 report = json.loads(job['report_path'].read_text(encoding='utf-8'))
                 report.update(name=job['name'], id=ident)
                 if 'convertedFrom' in job:
-                    report.update(convertedFrom=job['convertedFrom'], converter=self.converter)
+                    report.update(convertedFrom=job['convertedFrom'], converter=job['tool'])
                 self.documents[ident] = {'report': report, 'path': job['path']}
             return {key: job[key] for key in ('status', 'phase', 'completed', 'total', 'error') if key in job} | {'id': ident}
 
@@ -176,6 +191,8 @@ class Engine:
                     job['process'].join(timeout=5)
                 elif 'converter' in job:
                     job['converter'].kill()
+                elif 'stop' in job:
+                    job['stop'].set()
                 job['status'] = 'cancelled'
             return {'status': job['status']}
 
@@ -455,7 +472,7 @@ class Handler(BaseHTTPRequestHandler):
             width = int(parse_qs(url.query).get('width', ['1000'])[0])
             if path == '/api/config':
                 return self.send(200, {
-                    'token': self.engine.token, 'converter': self.engine.converter,
+                    'token': self.engine.token, 'converter': self.engine.converter, 'transcriber': self.engine.transcriber,
                     'samples': [{'id': i, 'name': p.name, 'bytes': p.stat().st_size}
                                 for i, p in enumerate(self.engine.samples) if p.exists()],
                 })
@@ -592,14 +609,18 @@ class Handler(BaseHTTPRequestHandler):
                 source = self.engine.samples[index]
                 return self.send(202, {'job': self.engine.submit(source, source.name)})
             if path == '/api/open':
-                if not 0 < length <= 1024**3:
-                    return self.send(413, {'error': 'Choose a PDF smaller than 1 GB for this prototype.'})
                 name = unquote(self.headers.get('X-Filename', 'document.pdf')).replace('\\', '/').rsplit('/', 1)[-1][:200]
-                presentation = is_presentation(name)
+                presentation, recording, transcript = is_presentation(name), is_recording(name), is_transcript(name)
+                # AssemblyAI takes uploads up to 2.2 GB; a lecture video can be larger than a PDF.
+                if not 0 < length <= (2 if recording else 1) * 1024**3:
+                    return self.send(413, {'error': 'Choose a recording smaller than 2 GB.' if recording else 'Choose a PDF smaller than 1 GB for this prototype.'})
                 if presentation and self.engine.converter is None:
                     raise ValueError('Opening presentations needs Microsoft PowerPoint or LibreOffice on this computer.')
-                # Office programs go by the extension, so a presentation keeps its own.
-                target = self.engine.directory / (uuid.uuid4().hex + (Path(name).suffix.lower() if presentation else '.pdf'))
+                if recording and self.engine.transcriber is None:
+                    raise ValueError('Transcribing recordings is not set up in this copy of Paperweight.')
+                # Office programs and AssemblyAI go by the extension, so those files keep their own.
+                keep = presentation or recording or transcript
+                target = self.engine.directory / (uuid.uuid4().hex + (Path(name).suffix.lower() if keep else '.pdf'))
                 with target.open('wb') as out:
                     remaining = length
                     while remaining:
@@ -612,7 +633,9 @@ class Handler(BaseHTTPRequestHandler):
                     head = inp.read(1024)
                 if presentation and not head.startswith((b'PK', b'\xd0\xcf\x11\xe0')):
                     raise ValueError('This file is not a presentation PowerPoint can open.')
-                if not presentation and b'%PDF-' not in head:
+                if transcript and not head.lstrip(b'\xef\xbb\xbf \t\r\n').startswith((b'[', b'{')):
+                    raise ValueError('This file is not an AssemblyAI transcript.')
+                if not keep and b'%PDF-' not in head:
                     raise ValueError('This file is not a PDF. Please choose a PDF file.')
                 return self.send(202, {'job': self.engine.submit(target, name)})
             self.send(404, {'error': 'Not found.'})
