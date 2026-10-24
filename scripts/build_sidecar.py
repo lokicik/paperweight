@@ -22,7 +22,7 @@ command = [
     '--specpath', str(build), str(root / 'scripts' / 'engine_entry.py'),
 ]
 key_file, module = root / 'assemblyai.key', root / 'backend' / 'paperweight' / '_key.py'
-key = os.environ.get('ASSEMBLYAI_API_KEY', '').strip() or (key_file.read_text(encoding='utf-8').strip() if key_file.is_file() else '')
+key = os.environ.get('ASSEMBLYAI_API_KEY', '').strip() or (key_file.read_text(encoding='utf-8-sig').strip() if key_file.is_file() else '')
 if key:
     secret = key.encode()
     mask = os.urandom(len(secret))
